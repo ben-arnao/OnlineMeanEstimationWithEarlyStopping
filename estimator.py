@@ -2,7 +2,9 @@ import numpy as np
 
 # This is a small algo i wrote for estimating a fixed value when there is a lot of variance/noise present.
 # the algo incorporates a way to define mathematically when our estimator is "stationary" and therefore has arrived
-# at the true value and only fluctuates due to noise.
+# at the true value and only fluctuates due to noise. Because it is "online" we do not need to keep a history 
+# of parameters, so this method really would only apply when needing to estimate many parameters such that it is
+# infeasible to store a large history of the entire parameter space.
 
 # min_param_change_perc: the percentage of parameters that need to be considered "stationary" to add to the 
 # estimation complete counter
