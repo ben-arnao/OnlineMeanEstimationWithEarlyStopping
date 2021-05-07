@@ -3,8 +3,6 @@
 Example usage
 
 ```python
-from matplotlib import pyplot
-
 e = Estimator(1, min_param_change_perc=1, param_change_delta=0.1, param_change_patience=200, momentum=0.995)
 ma_hist = []
 complete = []
