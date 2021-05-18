@@ -21,39 +21,50 @@ import numpy as np
 class Estimator:
 
     def __init__(self,
-                 num_params,
+                 num_params=1,
                  min_param_change_perc=1e-2,
                  param_change_delta=1e-2,
                  param_change_patience=5,
-                 momentum=0.9
+                 momentum=0.9,
+                 bounds_mode='flat'  # or 'scaled'
                  ):
-
+        
+        self.bounds_mode = bounds_mode
         self.num_params = num_params
         self.momentum = momentum
-        self.min_param_change_perc = min_param_change_perc
+        if self.num_params == 1:
+            self.min_param_change_perc = 1
+        else:
+            self.min_param_change_perc = min_param_change_perc
         self.param_change_delta = param_change_delta
         self.param_change_patience = param_change_patience
         self.param_change_wait = 0
 
         self.mov_avg = np.zeros(num_params, dtype=np.float32)
-        self.hi = np.zeros(num_params, dtype=np.float32)
-        self.lo = np.zeros(num_params, dtype=np.float32)
+        self.anchor = np.zeros(num_params, dtype=np.float32)
 
     def estimate(self, new_sample):
         self.mov_avg = self.mov_avg * self.momentum + new_sample * (1 - self.momentum)
+        
+        if self.bounds_mode == 'flat':
+            is_new_high = np.where(self.mov_avg > self.anchor + self.param_change_delta, True, False)
+            is_new_low = np.where(self.mov_avg < self.anchor - self.param_change_delta, True, False)
+        elif self.bounds_mode == 'scaled':
+            is_new_high = np.where(self.mov_avg > self.anchor * (1 + self.param_change_delta), True, False)
+            is_new_low = np.where(self.mov_avg < self.anchor / (1 + self.param_change_delta), True, False)
+        else:
+            raise Exception('Invalid bounds mode supplied')
+        
+        # params where average went outside it's bounds
+        mom_change = np.logical_or(is_new_high, is_new_low)
 
-        is_new_high = np.where(self.mov_avg > self.hi + self.param_change_delta, True, False)
-        is_new_low = np.where(self.mov_avg < self.lo - self.param_change_delta, True, False)
+        # update anchor
+        self.anchor = np.where(mom_change, self.mov_avg, self.anchor)
 
-        self.hi = np.where(is_new_high, self.mov_avg, self.hi)
-        self.lo = np.where(is_new_low, self.mov_avg, self.lo)
+        # get percent of mean estimations that are non-stationary
+        est_chg_perc = np.sum(mom_change) / self.num_params
 
-        hi_delta_perc = np.sum(is_new_high) / self.num_params
-        lo_delta_perc = np.sum(is_new_low) / self.num_params
-
-        delta_perc = hi_delta_perc + lo_delta_perc
-
-        if delta_perc < self.min_param_change_perc:
+        if est_chg_perc < self.min_param_change_perc:
             self.param_change_wait += 1
         else:
             self.param_change_wait = 0
